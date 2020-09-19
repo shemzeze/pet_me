@@ -6,7 +6,7 @@ cap = cv2.VideoCapture(0)
 cap2 = cv2.VideoCapture("Dog.mp4")
 img = cv2.imread("cam_guidelines.png")
 sourcePath = "Dog.mp4"
-player = MediaPlayer(sourcePath)
+# player = MediaPlayer(sourcePath)
 
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -21,11 +21,11 @@ out = cv2.VideoWriter("dog_out_1.mp4", fourcc, 30, (width, height))
 while True:
     ret, frame = cap.read()
     ret, frame2 = cap2.read()
-    audio_frame, val = player.get_frame()
+    # audio_frame, val = player.get_frame()
     # frame2_resized = cv2.resize(frame2, (500, 500))
     frame2_resized = cv2.resize(frame2, (width2 // 2, height2 // 2))
     rows, columns, channels = frame2_resized.shape
-    print(frame2_resized)
+    # print(frame2_resized.shape)
     R = cv2.getRotationMatrix2D((columns / 2, rows / 2), 270, 0.5)
     frame2_rot = cv2.warpAffine(frame2_resized, R, (columns, rows))
     img_resize = cv2.resize(img, (width, height))
