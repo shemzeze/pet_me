@@ -1,6 +1,8 @@
 import dlib, cv2, sys
 from imutils import face_utils
 import numpy as np
+import matplotlib.pyplot as plt
+
 vid = "Dog small.mp4"
 
 
@@ -45,5 +47,9 @@ def find_dog_face(vid):
     return nose_coordinates//SCALE_FACTOR
 
 
-print(find_dog_face("Dog small.mp4"))
-# find_dog_face("Dog_1.mp4")
+# print(find_dog_face("Dog small.mp4"))
+coordinates = find_dog_face(("Dog small.mp4"))
+for row in coordinates:
+    if row - (row-1) >= 10:
+        row2 = (row + (row-1))/2
+    print(row2)
