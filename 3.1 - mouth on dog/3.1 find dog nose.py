@@ -17,12 +17,20 @@ fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
 out = cv2.VideoWriter('PetMe.mp4', fourcc, 30, (width, height))
 detector = dlib.cnn_face_detection_model_v1('dogHeadDetector.dat')
 predictor = dlib.shape_predictor('landmarkDetector.dat')
+
+outer_loop = 0
+inner_loop = 0
+inner_sub_loop = 0
+img_result2 = None
 while True:
+    outer_loop += 1
+    # print("rendering frame number: " + str(outer_loop))
+
     ret, frame = cap.read()
     ret, frame2 = cap2.read()
     frame2_alpha = cv2.cvtColor(frame2, cv2.COLOR_BGR2BGRA)
     frame2_resize = cv2.resize(frame2_alpha, (width2//3, height2//3))
-    # print(frame2_resize.shape)
+    print(frame2_resize.shape)
     frame2_cropped = frame2_resize[140:280, 250:390]
     frame2_gray = cv2.cvtColor(frame2_cropped, cv2.COLOR_BGR2GRAY)
     _, mouth_mask = cv2.threshold(frame2_gray, 5, 255, cv2.THRESH_BINARY_INV)
@@ -34,7 +42,7 @@ while True:
     dets = detector(frame_gray, upsample_num_times=1)
 
     for i, d in enumerate(dets):
-
+        inner_loop += 1
         x1, y1 = int(d.rect.left() / SCALE_FACTOR), int(d.rect.top() / SCALE_FACTOR)
         x2, y2 = int(d.rect.right() / SCALE_FACTOR), int(d.rect.bottom() / SCALE_FACTOR)
         # cv2.rectangle(img_result, (x1, y1), (x2, y2), (255, 0, 0), thickness=2)
@@ -43,6 +51,7 @@ while True:
         shape = face_utils.shape_to_np(shape)
 
         for m, p in enumerate(shape):
+            inner_sub_loop += 1
             p = shape[3]
             px, py = (p / SCALE_FACTOR).astype(int)
             # print(px, py)
@@ -52,12 +61,15 @@ while True:
             dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
             final_mouth = cv2.add(dog_face_no_mouth, frame2_cropped)
             img_result[py - 60:py + 80, px - 70:px + 70] = final_mouth
-            img_result2 = cv2.cvtColor(img_result, cv2.COLOR_BGRA2BGR)
+            img_result = cv2.cvtColor(img_result, cv2.COLOR_BGRA2BGR)
 
-    cv2.imshow('result', img_result2)
+    cv2.imshow('result', img_result)
     if (cv2.waitKey(1) & 0xFF == ord('q')):
         break
-    out.write(img_result2)
+
+    if img_result2 is not None:
+        out.write(img_result2)
+
 
 cap.release()
 out.release()

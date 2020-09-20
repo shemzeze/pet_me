@@ -1,18 +1,19 @@
 import dlib, cv2, sys
 from imutils import face_utils
 import numpy as np
-vid = "Dog_1.mp4"
+vid = "Dog small.mp4"
 
 
 def find_dog_face(vid):
-    nose_coordinates = []
-    SCALE_FACTOR = 0.3
+    SCALE_FACTOR = 0.2
     vid = sys.argv[0]
-    cap = cv2.VideoCapture("Dog_1.mp4")
+    cap = cv2.VideoCapture("Dog small.mp4")
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     detector = dlib.cnn_face_detection_model_v1('dogHeadDetector.dat')
     predictor = dlib.shape_predictor('landmarkDetector.dat')
+    nose_coordinates = np.empty((0, 2), dtype=int)
+    # print(nose_coordinates)
 
     while cap.isOpened():
 
@@ -20,7 +21,7 @@ def find_dog_face(vid):
 
         if not ret:
             break
-
+        img_result = frame.copy()
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frame = cv2.resize(frame, dsize=None, fx=SCALE_FACTOR, fy=SCALE_FACTOR)
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -35,10 +36,14 @@ def find_dog_face(vid):
 
             for m, p in enumerate(shape):
                 p = shape[3]
-                nose_coordinates = np.array(p)
-                # print(nose_coordinates)
-                # return nose_coordinates
+                nose_coordinates = np.append(nose_coordinates, ([p]), axis=0)
+                # print(p)
+        img_result = cv2.cvtColor(img_result, cv2.COLOR_BGRA2BGR)
+        cv2.imshow('result', img_result)
+        if (cv2.waitKey(1) & 0xFF == ord('q')):
+            break
+    return nose_coordinates//SCALE_FACTOR
 
 
-# print(find_dog_face("Dog_1.mp4"))
-find_dog_face("Dog_1.mp4")
+print(find_dog_face("Dog small.mp4"))
+# find_dog_face("Dog_1.mp4")
