@@ -53,14 +53,14 @@ while True:
         for m, p in enumerate(shape):
             inner_sub_loop += 1
             p = shape[3]
-            px, py = (p / SCALE_FACTOR).astype(int)
+            py, px = (p / SCALE_FACTOR).astype(int)
             # print(px, py)
-            mouth_area = img_result[py-60:py+80, px-70:px+70]
+            mouth_area = img_result[px-60:px+80, py-70:py+70]
             # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
             # cv2.putText(img_result, "nose", tuple((p / SCALE_FACTOR).astype(int)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
             dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
             final_mouth = cv2.add(dog_face_no_mouth, frame2_cropped)
-            img_result[py - 60:py + 80, px - 70:px + 70] = final_mouth
+            img_result[px - 60:px + 80, py - 70:py + 70] = final_mouth
             img_result = cv2.cvtColor(img_result, cv2.COLOR_BGRA2BGR)
 
     cv2.imshow('result', img_result)
