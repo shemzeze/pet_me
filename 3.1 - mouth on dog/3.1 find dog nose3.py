@@ -110,6 +110,7 @@ while cap.isOpened():
     frame2_cropped = frame2_resize[140:280, 250:390]
     frame2_gray = cv2.cvtColor(frame2_cropped, cv2.COLOR_BGR2GRAY)
     _, mouth_mask = cv2.threshold(frame2_gray, 5, 255, cv2.THRESH_BINARY_INV)
+    frame2_darker = cv2.addWeighted(frame2_cropped, 1, np.zeros(frame2_cropped.shape, frame2_cropped.dtype), 0, -20)
     img_result = final_frame.copy()
     img_result = cv2.cvtColor(final_frame, cv2.COLOR_BGR2BGRA)
     px = coordinates_smooth_final_x[f]
@@ -123,7 +124,7 @@ while cap.isOpened():
     # print(mouth_area.shape)
     # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
     dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
-    final_mouth = cv2.add(dog_face_no_mouth, frame2_cropped)
+    final_mouth = cv2.add(dog_face_no_mouth, frame2_darker)
     img_result[py - 60:py + 80, px - 70:px + 70] = final_mouth
     cv2.imshow('result', img_result)
     if cv2.waitKey(fps) & 0xFF == ord('q'):
