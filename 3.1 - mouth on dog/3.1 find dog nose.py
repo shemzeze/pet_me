@@ -54,9 +54,9 @@ while True:
             inner_sub_loop += 1
             p = shape[3]
             py, px = (p / SCALE_FACTOR).astype(int)
-            # print(px, py)
+            print(px, py)
             mouth_area = img_result[px-60:px+80, py-70:py+70]
-            print(mouth_area.shape, mouth_mask.shape)
+            # print(mouth_area.shape, mouth_mask.shape)
             # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
             # # cv2.putText(img_result, "nose", tuple((p / SCALE_FACTOR).astype(int)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
             dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
