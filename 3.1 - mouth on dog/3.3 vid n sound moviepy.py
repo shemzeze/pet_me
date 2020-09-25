@@ -1,6 +1,6 @@
 from moviepy.editor import *
 
-clip = VideoFileClip("PetMe out1.mp4")
+clip = VideoFileClip("dog_out_smooth.mp4")
 clip2 = VideoFileClip("Mouth.mp4")
 clip3 = VideoFileClip("Dog.mp4")
 clip2 = clip2.set_fps(30.0)
@@ -14,7 +14,7 @@ aclip3 = clip3.audio
 # sound_both = concatenate_audioclips([aclip, aclip2])
 sound_both2 = CompositeAudioClip([aclip3, aclip2])
 clip.audio = sound_both2
-clip.write_videofile("new.mp4")
+clip.write_videofile("final smooth.mp4")
 # sound_both2.nchannels = max([2])
 # sound_both2.write_audiofile("both_sound.mp3")
 # print()
