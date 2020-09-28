@@ -18,3 +18,4 @@ while cap.isOpened():
 cap.release()
 out.release()
 cv2.destroyAllWindows()
+
