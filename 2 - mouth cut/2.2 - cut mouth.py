@@ -8,7 +8,7 @@ detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-sourcePath = "Mouth.mp4"
+sourcePath = "Stabilize head.mp4"
 player = MediaPlayer(sourcePath)
 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
 out = cv2.VideoWriter("Mouth_crop.mp4", fourcc, 30, (width, height))
@@ -61,7 +61,7 @@ while (True):
 
     mouth_mask = cv2.bitwise_and(frame_rot, frame_rot, mask=mask)
     cv2.imshow("mouth mask", mouth_mask)
-    if (cv2.waitKey(18) & 0xFF == ord('q')):
+    if (cv2.waitKey(30) & 0xFF == ord('q')):
         break
     out.write(mouth_mask)
 

@@ -3,10 +3,15 @@ from imutils import face_utils
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from math import hypot
+from math import hypot, atan2, degrees
 
 
 vid = "Dog small.mp4"
+
+def angle_between(p1, p2):
+  xDiff = p2[0] - p1[0]
+  yDiff = p2[1] - p1[1]
+  return degrees(atan2(yDiff, xDiff))
 
 
 def find_dog_face(vid):
@@ -21,6 +26,7 @@ def find_dog_face(vid):
     left_eye_coordinates = np.empty((0, 2), dtype=int)
     right_eye_coordinates = np.empty((0, 2), dtype=int)
     eyes_width_arr = np.empty(1, dtype="int32")
+    angle_eyes = []
 
     # print(nose_coordinates)
 
@@ -49,21 +55,22 @@ def find_dog_face(vid):
             left_eye_coordinates = np.append(left_eye_coordinates, [left_eye], axis=0)
             right_eye = shape[2]
             right_eye_coordinates = np.append(right_eye_coordinates, [right_eye], axis=0)
-
-        eyes_width = int(hypot(int(left_eye[1]-right_eye[1]), int(left_eye[0]-right_eye[0])))
-        # print(eyes_width)
-        eyes_width_arr = np.append(eyes_width_arr, [eyes_width], axis=0)
+            eyes_width = int(hypot(int(left_eye[1]-right_eye[1]), int(left_eye[0]-right_eye[0])))
+            eyes_width_arr = np.append(eyes_width_arr, [eyes_width], axis=0)
+            angle = angle_between(left_eye, right_eye)
+            angle_eyes.append(angle)
         img_result = cv2.cvtColor(img_result, cv2.COLOR_BGRA2BGR)
         cv2.imshow('result', img_result)
         if (cv2.waitKey(1) & 0xFF == ord('q')):
             break
     eyes_width_arr = eyes_width_arr[1:]
+    print(angle_eyes)
     # print(eyes_width_arr)
-    return nose_coordinates*5, eyes_width_arr*10
+    return nose_coordinates*5, eyes_width_arr*7, angle_eyes
 
 
-coordinates, eyes_hypot = find_dog_face("Dog small.mp4")
-print(eyes_hypot)
+coordinates, eyes_hypot, angle_mouth = find_dog_face("Dog small.mp4")
+# print(eyes_hypot)
 coordinates_x = coordinates[:, 0]
 coordinates_y = coordinates[:, 1]
 coordinates_smooth_x = np.empty(1, dtype="int32")
@@ -71,22 +78,24 @@ coordinates_smooth_y = np.empty(1, dtype="int32")
 eyes_hypot_smooth = np.empty(1, dtype="int32")
 
 
-x_smooth_float = savgol_filter(coordinates_x, 21, 3, mode="nearest")
+x_smooth_float = savgol_filter(coordinates_x, 31, 3, mode="nearest")
 for x in x_smooth_float:
     x = int(x)
     coordinates_smooth_x = np.append(coordinates_smooth_x, [x], axis=0)
-y_smooth_float = savgol_filter(coordinates_y, 21, 3, mode="nearest")
+y_smooth_float = savgol_filter(coordinates_y, 31, 3, mode="nearest")
 for y in y_smooth_float:
     y = int(y)
     coordinates_smooth_y = np.append(coordinates_smooth_y, [y], axis=0)
 
-eyes_hypot_smooth_float = savgol_filter(eyes_hypot, 21, 3, mode="nearest")
+eyes_hypot_smooth_float = savgol_filter(eyes_hypot, 31, 3, mode="nearest")
 for w in eyes_hypot_smooth_float:
     w = int(w)
     eyes_hypot_smooth = np.append(eyes_hypot_smooth, [w], axis=0)
-# plt.plot(eyes_hypot, color="red")
-# # plt.plot(coordinates_y, color="red")
-# plt.plot(eyes_hypot_smooth[1:], color="green")
+angle_mouth_smooth_float = savgol_filter(angle_mouth, 31, 3, mode="nearest")
+
+# plt.plot(angle_mouth_smooth_float, color="red")
+# # # plt.plot(coordinates_y, color="red")
+# plt.plot(angle_mouth, color="green")
 # # plt.plot(coordinates_smooth_y[1:], color="green")
 # print(eyes_hypot_smooth[1:])
 # # print(coordinates_smooth_y)
@@ -115,28 +124,32 @@ while cap.isOpened():
     px = coordinates_smooth_final_x[f]
     py = coordinates_smooth_final_y[f]
     eyes_hypot_smooth_width = eyes_hypot_smooth[f]
+    eyes_hypot_smooth_height = eyes_hypot_smooth_width
     frame2_alpha = cv2.cvtColor(frame2, cv2.COLOR_BGR2BGRA)
     frame2_resize = cv2.resize(frame2_alpha, (width2 // 3, height2 // 3))
     # print(frame2_resize.shape)
-    frame2_cropped = frame2_resize[px-(eyes_hypot_smooth_width // 2):px+(eyes_hypot_smooth_width // 2), py-(eyes_hypot_smooth_width // 2):py+(eyes_hypot_smooth_width // 2)]
-    frame2_gray = cv2.cvtColor(frame2_cropped, cv2.COLOR_BGR2GRAY)
-    _, mouth_mask = cv2.threshold(frame2_gray, 5, 255, cv2.THRESH_BINARY_INV)
-    frame2_darker = cv2.addWeighted(frame2_cropped, 1, np.zeros(frame2_cropped.shape, frame2_cropped.dtype), 0, -20)
+    frame2_cropped = frame2_resize[140:280, 250:390]
+    frame2_resize_from_eyes = cv2.resize(frame2_cropped, (eyes_hypot_smooth_width, eyes_hypot_smooth_height))
+    # M = cv2.getRotationMatrix2D((px, py), angle_mouth_smooth_float[f], 1)
+    # frame2_rot = cv2.warpAffine(frame2_resize_from_eyes, M, (frame2_resize_from_eyes.shape[1], frame2_resize_from_eyes.shape[0]))
+    frame2_gray = cv2.cvtColor(frame2_resize_from_eyes, cv2.COLOR_BGR2GRAY)
+    _, mouth_mask = cv2.threshold(frame2_gray, 2, 255, cv2.THRESH_BINARY_INV)
+    frame2_darker = cv2.addWeighted(frame2_resize_from_eyes, 1, np.zeros(frame2_resize_from_eyes.shape, frame2_resize_from_eyes.dtype), 0, -10)
     img_result = final_frame.copy()
     img_result = cv2.cvtColor(final_frame, cv2.COLOR_BGR2BGRA)
 
-    # print("frame " + str(f))
-    # print(coordinates[f][1])
-    # print(px, py)
-    # mouth_area = img_result[py - 60:py + 80, px - 70:px + 70]
+    # to change the location of the mouth, change the (int(eyes_hypot_smooth_width // x - the higher x the lower the mouth
+    top_left_mouth_area = (px-(eyes_hypot_smooth_width // 2), py-(int(eyes_hypot_smooth_width // 2.8)))
+    bottom_right_mouth_area = (px+(eyes_hypot_smooth_width // 2), py+(eyes_hypot_smooth_width // 2))
+    mouth_area = img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height, top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width]
     # cv2.circle(img_result, center=tuple([px, py]), radius=5, color=(0, 0, 255), thickness=-1)
+    # # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
+    dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
+    final_mouth = cv2.addWeighted(dog_face_no_mouth, 1,  frame2_darker, 1, 1)
+    img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height, top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width] = final_mouth
+    cv2.imshow('result', img_result)
     f += 1
-    # print(mouth_area.shape)
-    # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
-    # dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
-    # final_mouth = cv2.add(dog_face_no_mouth, frame2_darker)
-    # img_result[py - 60:py + 80, px - 70:px + 70] = final_mouth
-    cv2.imshow('result', frame2_cropped)
+    # cv2.imshow('result2', dog_face_no_mouth)
     if cv2.waitKey(fps) & 0xFF == ord('q'):
         break
     img_result = cv2.cvtColor(img_result, cv2.COLOR_BGRA2BGR)
