@@ -7,11 +7,10 @@ BUFFER_SIZE = 1024
 # print(str(host))
 port = 8080
 s.bind((host, port))
-s.listen(1)
 
 while True:
     print("waiting for someone to connect...")
-
+    s.listen(1)
     conn, addr = s.accept()
     print(addr, "has connected to me")
     client_ip, client_port = addr
