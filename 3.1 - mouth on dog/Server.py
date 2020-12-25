@@ -17,7 +17,7 @@ while True:
     # print(conn)
     # print(client_port)
     # s.connect()
-    with open('received_file', 'wb') as f:
+    with open('received_file.mp4', 'wb') as f:
         # print ('file opened')
         while True:
             print('receiving data...')
