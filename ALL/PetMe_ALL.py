@@ -7,6 +7,7 @@ from scipy.signal import savgol_filter
 from math import hypot, atan2, degrees
 from vidstab import VidStab
 from moviepy.editor import *
+from moviepy import video
 
 
 def angle_between(p1, p2):
@@ -16,9 +17,13 @@ def angle_between(p1, p2):
 
 
 def find_dog_face(vid):
+    print("finding pet Landmarks")
+    clip = VideoFileClip("VID_PET.mp4")
+    clip = video.fx.all.resize(clip, (320, 640))
+    clip.write_videofile("VID_PET_SMALL.mp4")
     SCALE_FACTOR = 0.2
     vid = sys.argv[0]
-    cap = cv2.VideoCapture("Dog small.mp4")
+    cap = cv2.VideoCapture("VID_PET_SMALL.mp4")
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     detector = dlib.cnn_face_detection_model_v1('dogHeadDetector.dat')
@@ -28,6 +33,7 @@ def find_dog_face(vid):
     right_eye_coordinates = np.empty((0, 2), dtype=int)
     eyes_width_arr = np.empty(1, dtype="int32")
     angle_eyes = []
+
 
     # print(nose_coordinates)
 
@@ -42,6 +48,7 @@ def find_dog_face(vid):
         frame = cv2.resize(frame, dsize=None, fx=SCALE_FACTOR, fy=SCALE_FACTOR)
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         roi = detector(frame_gray, upsample_num_times=1)
+        print("detector working")
 
         for i, d in enumerate(roi):
             x1, y1 = int(d.rect.left() / SCALE_FACTOR), int(d.rect.top() / SCALE_FACTOR)
@@ -59,6 +66,8 @@ def find_dog_face(vid):
             eyes_width_arr = np.append(eyes_width_arr, [eyes_width], axis=0)
             angle = angle_between(left_eye, right_eye)
             angle_eyes.append(angle)
+            cv2.circle(img_result, center=tuple((nose / SCALE_FACTOR).astype(int)), radius=5, color=(255, 0, 0),
+                       thickness=-1, lineType=cv2.LINE_AA)
         img_result = cv2.cvtColor(img_result, cv2.COLOR_BGRA2BGR)
         cv2.imshow('result', img_result)
         if (cv2.waitKey(1) & 0xFF == ord('q')):
@@ -71,7 +80,7 @@ def find_dog_face(vid):
 
 s = socket.socket()
 host = socket.gethostname()
-ip_address = "192.168.0.10"
+ip_address = "192.168.0.12"
 BUFFER_SIZE = 1024
 port = 8080
 s.bind((host, port))
@@ -97,11 +106,10 @@ while True:
     coordinates, eyes_hypot, angle_mouth = find_dog_face("VID_PET.mp4")
     coordinates_x = coordinates[:, 0]
     coordinates_y = coordinates[:, 1]
+    x_smooth_float = savgol_filter(coordinates_x, 31, 3, mode="nearest")
     coordinates_smooth_x = np.empty(1, dtype="int32")
     coordinates_smooth_y = np.empty(1, dtype="int32")
     eyes_hypot_smooth = np.empty(1, dtype="int32")
-
-    x_smooth_float = savgol_filter(coordinates_x, 31, 3, mode="nearest")
     for x in x_smooth_float:
         x = int(x)
         coordinates_smooth_x = np.append(coordinates_smooth_x, [x], axis=0)
@@ -126,6 +134,9 @@ while True:
     coordinates_smooth_final_x = coordinates_smooth_x[1:]
     coordinates_smooth_final_y = coordinates_smooth_y[1:]
     eyes_hypot_smooth = eyes_hypot_smooth[1:]
+    for x in coordinates_smooth_final_x:
+        if x == 0:
+            x =
     s.close()
     print('connection closed')
     break
@@ -133,15 +144,15 @@ while True:
 
 s2 = socket.socket()
 host = socket.gethostname()
-ip_address = "192.168.0.10"
+ip_address = "192.168.0.12"
 BUFFER_SIZE = 1024
 port = 8080
 s2.bind((host, port))
 
 while True:
-    print("waiting for someone to connect...")
     s2.listen(1)
-    conn, addr = s.accept()
+    print("waiting for someone to connect...")
+    conn, addr = s2.accept()
     print(addr, "has connected to me")
     client_ip, client_port = addr
     with open('VID_FACE.mp4', 'wb') as f:
@@ -157,20 +168,26 @@ while True:
             f.write(data)
     f.close()
     print('Successfully get the file')
+    clip2 = VideoFileClip("VID_FACE.mp4")
+    clip2 = video.fx.all.resize(clip2, (320, 640))
+    clip2.write_videofile("VID_FACE_SMALL.mp4")
+    print("Stabilizing face vid")
     stabilizer = VidStab()
-    stabilizer.stabilize(input_path="VID_FACE.mp4", output_path="VID_FACE_STAB.mp4", output_fourcc="mp4v",
+    stabilizer.stabilize(input_path="VID_FACE_SMALL.mp4", output_path="VID_FACE_STAB.mp4", output_fourcc="mp4v",
                          smoothing_window=100)
     print("Video is stabilized")
-    cap = cv2.VideoCapture("VID_FACE_STAB.mp4")
+    cap2 = cv2.VideoCapture("VID_FACE_STAB.mp4")
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    width = int(cap2.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap2.get(cv2.CAP_PROP_FRAME_HEIGHT))
     sourcePath = "Stabilize head.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter("VID_MOUTH_CROP.mp4", fourcc, 30, (width, height))
     while True:
-        ret, frame = cap.read()
+        ret, frame = cap2.read()
+        if not ret:
+            break
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         mask = np.zeros_like(gray)
         faces = detector(gray)
@@ -201,7 +218,7 @@ while True:
         if cv2.waitKey(30) & 0xFF == ord('q'):
             break
         out.write(mouth_mask)
-    cap.release()
+    cap2.release()
     out.release()
     cv2.destroyAllWindows()
     s2.close()
@@ -220,7 +237,7 @@ height4 = int(cap4.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
 out = cv2.VideoWriter("FINAL_NO_SOUND.mp4", fourcc, 30, (width, height))
 
-while cap.isOpened():
+while cap3.isOpened():
     ret, final_frame = cap3.read()
     ret, frame2 = cap4.read()
     if not ret:
@@ -259,7 +276,8 @@ while cap.isOpened():
     img_result = cv2.cvtColor(img_result, cv2.COLOR_BGRA2BGR)
     out.write(img_result)
 out.release()
-cap.release()
+cap3.release()
+cap4.release()
 cv2.destroyAllWindows()
 
 
@@ -276,7 +294,7 @@ clip.write_videofile("FINAL_PETME.mp4")
 
 s3 = socket.socket()
 host = socket.gethostname()
-ip_address = "192.168.0.10"
+ip_address = "192.168.0.12"
 BUFFER_SIZE = 1024
 port = 8080
 s3.bind((host, port))
