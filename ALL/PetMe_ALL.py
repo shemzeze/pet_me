@@ -75,7 +75,7 @@ def find_dog_face(vid):
     eyes_width_arr = eyes_width_arr[1:]
     # print(angle_eyes)
     # print(eyes_width_arr)
-    return nose_coordinates * 5, eyes_width_arr * 4, angle_eyes
+    return nose_coordinates * 5, eyes_width_arr * 5, angle_eyes
 
 
 s = socket.socket()
@@ -257,8 +257,10 @@ while True:
     img_result = cv2.cvtColor(final_frame, cv2.COLOR_BGR2BGRA)
 
     # to change the location of the mouth, change the (int(eyes_hypot_smooth_width // x - the higher x the lower the mouth
-    top_left_mouth_area = (px-(eyes_hypot_smooth_width // 2), py-(int(eyes_hypot_smooth_width // 2.8)))
-    bottom_right_mouth_area = (px+(eyes_hypot_smooth_width // 2), py+(eyes_hypot_smooth_width // 2))
+    # top_left_mouth_area = (px-(eyes_hypot_smooth_width // 2), py-(int(eyes_hypot_smooth_width // 5)))
+    # bottom_right_mouth_area = (px+(eyes_hypot_smooth_width // 2), py+(eyes_hypot_smooth_width // 2))
+    top_left_mouth_area = (px-(eyes_hypot_smooth_width // 2), py)
+    bottom_right_mouth_area = (px+(eyes_hypot_smooth_width // 2), py+eyes_hypot_smooth_width)
     mouth_area = img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height, top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width]
     # cv2.circle(img_result, center=tuple([px, py]), radius=5, color=(0, 0, 255), thickness=-1)
     # # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
