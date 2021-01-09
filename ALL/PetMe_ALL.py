@@ -56,7 +56,7 @@ def find_dog_face(vid):
             shape = predictor(frame_gray, d.rect)
             shape = face_utils.shape_to_np(shape)
             nose = shape[3]
-            # print(nose)
+            print(nose)
             nose_coordinates = np.append(nose_coordinates, [nose], axis=0)
             left_eye = shape[5]
             left_eye_coordinates = np.append(left_eye_coordinates, [left_eye], axis=0)
@@ -73,9 +73,9 @@ def find_dog_face(vid):
         if (cv2.waitKey(1) & 0xFF == ord('q')):
             break
     eyes_width_arr = eyes_width_arr[1:]
-    print(angle_eyes)
+    # print(angle_eyes)
     # print(eyes_width_arr)
-    return nose_coordinates * 5, eyes_width_arr * 7, angle_eyes
+    return nose_coordinates * 5, eyes_width_arr * 4, angle_eyes
 
 
 s = socket.socket()
@@ -134,9 +134,6 @@ while True:
     coordinates_smooth_final_x = coordinates_smooth_x[1:]
     coordinates_smooth_final_y = coordinates_smooth_y[1:]
     eyes_hypot_smooth = eyes_hypot_smooth[1:]
-    for x in coordinates_smooth_final_x:
-        if x == 0:
-            x =
     s.close()
     print('connection closed')
     break
@@ -215,7 +212,7 @@ while True:
 
         mouth_mask = cv2.bitwise_and(frame, frame, mask=mask)
         cv2.imshow("mouth mask", mouth_mask)
-        if cv2.waitKey(30) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         out.write(mouth_mask)
     cap2.release()
@@ -226,7 +223,7 @@ while True:
     break
 
 
-cap3 = cv2.VideoCapture("VID_PET.mp4")
+cap3 = cv2.VideoCapture("VID_PET_SMALL.mp4")
 cap4 = cv2.VideoCapture("VID_MOUTH_CROP.mp4")
 f = 0
 fps = int(cap3.get(cv2.CAP_PROP_FPS))
@@ -237,7 +234,7 @@ height4 = int(cap4.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
 out = cv2.VideoWriter("FINAL_NO_SOUND.mp4", fourcc, 30, (width, height))
 
-while cap3.isOpened():
+while True:
     ret, final_frame = cap3.read()
     ret, frame2 = cap4.read()
     if not ret:
@@ -247,13 +244,13 @@ while cap3.isOpened():
     eyes_hypot_smooth_width = eyes_hypot_smooth[f]
     eyes_hypot_smooth_height = eyes_hypot_smooth_width
     frame2_alpha = cv2.cvtColor(frame2, cv2.COLOR_BGR2BGRA)
-    frame2_resize = cv2.resize(frame2_alpha, (width4 // 3, height4 // 3))
-    # print(frame2_resize.shape)
-    frame2_cropped = frame2_resize[140:280, 250:390]
+    # print(frame2.shape)
+    # frame2_resize = cv2.resize(frame2_alpha, (width4 // 3, height4 // 3))
+    frame2_cropped = frame2_alpha[300:440, 80:220]
     frame2_resize_from_eyes = cv2.resize(frame2_cropped, (eyes_hypot_smooth_width, eyes_hypot_smooth_height))
     # M = cv2.getRotationMatrix2D((px, py), angle_mouth_smooth_float[f], 1)
     # frame2_rot = cv2.warpAffine(frame2_resize_from_eyes, M, (frame2_resize_from_eyes.shape[1], frame2_resize_from_eyes.shape[0]))
-    frame2_gray = cv2.cvtColor(frame2_resize_from_eyes, cv2.COLOR_BGR2GRAY)
+    frame2_gray = cv2.cvtColor(frame2_resize_from_eyes, cv2.COLOR_BGRA2GRAY)
     _, mouth_mask = cv2.threshold(frame2_gray, 2, 255, cv2.THRESH_BINARY_INV)
     frame2_darker = cv2.addWeighted(frame2_resize_from_eyes, 1, np.zeros(frame2_resize_from_eyes.shape, frame2_resize_from_eyes.dtype), 0, -10)
     img_result = final_frame.copy()
@@ -266,7 +263,7 @@ while cap3.isOpened():
     # cv2.circle(img_result, center=tuple([px, py]), radius=5, color=(0, 0, 255), thickness=-1)
     # # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
     dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
-    final_mouth = cv2.addWeighted(dog_face_no_mouth, 1,  frame2_darker, 1, 1)
+    final_mouth = cv2.addWeighted(dog_face_no_mouth, 1, frame2_resize_from_eyes, 1, 1)
     img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height, top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width] = final_mouth
     cv2.imshow('result', img_result)
     f += 1
@@ -284,7 +281,7 @@ cv2.destroyAllWindows()
 clip = VideoFileClip("FINAL_NO_SOUND.mp4")
 clip2 = VideoFileClip("VID_FACE.mp4")
 clip3 = VideoFileClip("VID_PET.mp4")
-clip2 = clip2.set_fps(30.0)
+# clip2 = clip2.set_fps(30.0)
 aclip = clip.audio
 aclip2 = clip2.audio
 aclip3 = clip3.audio
