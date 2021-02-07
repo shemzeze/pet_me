@@ -51,11 +51,24 @@ def find_dog_face(vid):
         roi = detector(frame_gray, upsample_num_times=1)
         # print("detector working")
         #
-        # if len(roi) == 0:
-        #     # Handle frame without dog face
-        #     np.append(nose_coordinates, nose_coordinates[-1], axis=0)
-        #
-        #     continue
+        if len(roi) == 0 and len(nose_coordinates) != 0:
+            # Handle frame without dog face
+            nose_coordinates = np.append(nose_coordinates, [nose_coordinates[-1]], axis=0)
+            print("last spot - ")
+            print(nose_coordinates[-1])
+            left_eye_coordinates = np.append(left_eye_coordinates, [left_eye_coordinates[-1]], axis=0)
+            right_eye_coordinates = np.append(right_eye_coordinates, [right_eye_coordinates[-1]], axis=0)
+            eyes_width_arr = np.append(eyes_width_arr, [eyes_width_arr[-1]], axis=0)
+            continue
+        elif len(roi) == 0 and len(nose_coordinates) == 0:
+            nose_coordinates = np.append(nose_coordinates, [[30, 60]], axis=0)
+            left_eye_coordinates = np.append(left_eye_coordinates, [[20, 50]], axis=0)
+            right_eye_coordinates = np.append(right_eye_coordinates, [[40, 50]], axis=0)
+            eyes_width_arr = np.append(eyes_width_arr, [20], axis=0)
+            print("random spot")
+            print(nose_coordinates[-1])
+            continue
+
 
         for i, d in enumerate(roi):
             # x1, y1 = int(d.rect.left() / SCALE_FACTOR), int(d.rect.top() / SCALE_FACTOR)
@@ -64,13 +77,14 @@ def find_dog_face(vid):
             shape = face_utils.shape_to_np(shape)
             nose = shape[3]
             print(nose)
-            print(type(nose))
+            # print(type(nose))
             nose_coordinates = np.append(nose_coordinates, [nose], axis=0)
             left_eye = shape[5]
             left_eye_coordinates = np.append(left_eye_coordinates, [left_eye], axis=0)
             right_eye = shape[2]
             right_eye_coordinates = np.append(right_eye_coordinates, [right_eye], axis=0)
             eyes_width = int(hypot(int(left_eye[1] - right_eye[1]), int(left_eye[0] - right_eye[0])))
+            print(eyes_width)
             eyes_width_arr = np.append(eyes_width_arr, [eyes_width], axis=0)
             angle = angle_between(left_eye, right_eye)
             angle_eyes.append(angle)
@@ -420,7 +434,7 @@ s4.bind((host, port))
 while True:
     s4.listen(1)
     print("waiting for someone to connect...")
-    conn, addr = s3.accept()
+    conn, addr = s4.accept()
     print('Got connection from', addr)
     # data = conn.recv(1024)
     # print('Server received', repr(data))
