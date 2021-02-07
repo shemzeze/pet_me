@@ -8,6 +8,7 @@ from math import hypot, atan2, degrees
 from vidstab import VidStab
 from moviepy.editor import *
 from moviepy import video
+import threading
 
 
 def angle_between(p1, p2):
@@ -48,15 +49,22 @@ def find_dog_face(vid):
         frame = cv2.resize(frame, dsize=None, fx=SCALE_FACTOR, fy=SCALE_FACTOR)
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         roi = detector(frame_gray, upsample_num_times=1)
-        print("detector working")
+        # print("detector working")
+        #
+        # if len(roi) == 0:
+        #     # Handle frame without dog face
+        #     np.append(nose_coordinates, nose_coordinates[-1], axis=0)
+        #
+        #     continue
 
         for i, d in enumerate(roi):
-            x1, y1 = int(d.rect.left() / SCALE_FACTOR), int(d.rect.top() / SCALE_FACTOR)
-            x2, y2 = int(d.rect.right() / SCALE_FACTOR), int(d.rect.bottom() / SCALE_FACTOR)
+            # x1, y1 = int(d.rect.left() / SCALE_FACTOR), int(d.rect.top() / SCALE_FACTOR)
+            # x2, y2 = int(d.rect.right() / SCALE_FACTOR), int(d.rect.bottom() / SCALE_FACTOR)
             shape = predictor(frame_gray, d.rect)
             shape = face_utils.shape_to_np(shape)
             nose = shape[3]
             print(nose)
+            print(type(nose))
             nose_coordinates = np.append(nose_coordinates, [nose], axis=0)
             left_eye = shape[5]
             left_eye_coordinates = np.append(left_eye_coordinates, [left_eye], axis=0)
@@ -80,7 +88,7 @@ def find_dog_face(vid):
 
 s = socket.socket()
 host = socket.gethostname()
-ip_address = "192.168.0.12"
+ip_address = "192.168.0.14"
 BUFFER_SIZE = 1024
 port = 8080
 s.bind((host, port))
@@ -103,6 +111,8 @@ while True:
             f.write(data)
     f.close()
     print('Successfully get the file')
+    # t1 = threading.Thread(target=find_dog_face, args="VID_PET.mp4")
+    # t1.start()
     coordinates, eyes_hypot, angle_mouth = find_dog_face("VID_PET.mp4")
     coordinates_x = coordinates[:, 0]
     coordinates_y = coordinates[:, 1]
@@ -141,7 +151,7 @@ while True:
 
 s2 = socket.socket()
 host = socket.gethostname()
-ip_address = "192.168.0.12"
+ip_address = "192.168.0.14"
 BUFFER_SIZE = 1024
 port = 8080
 s2.bind((host, port))
@@ -222,7 +232,7 @@ while True:
     print('connection closed')
     break
 
-
+# t1.join()
 cap3 = cv2.VideoCapture("VID_PET_SMALL.mp4")
 cap4 = cv2.VideoCapture("VID_MOUTH_CROP.mp4")
 f = 0
@@ -293,7 +303,7 @@ clip.write_videofile("FINAL_PETME.mp4")
 
 s3 = socket.socket()
 host = socket.gethostname()
-ip_address = "192.168.0.12"
+ip_address = "192.168.0.14"
 BUFFER_SIZE = 1024
 port = 8080
 s3.bind((host, port))
@@ -319,7 +329,115 @@ while True:
     f.close()
     print('Done sending')
     conn.close()
-    s2.close()
+    # s3.close()
     print('connection closed')
     break
 
+
+s3.listen(1)
+print("waiting for someone to connect...")
+conn, addr = s3.accept()
+x_offset = conn.recv(1024).decode()
+print(x_offset)
+y_offset = conn.recv(1024).decode()
+print(y_offset)
+x_offset_int = int(x_offset) // 5
+y_offset_int = int(y_offset) // 5
+s3.close()
+cap5 = cv2.VideoCapture("VID_PET_SMALL.mp4")
+cap6 = cv2.VideoCapture("VID_MOUTH_CROP.mp4")
+f = 0
+fps = int(cap5.get(cv2.CAP_PROP_FPS))
+width5 = int(cap5.get(cv2.CAP_PROP_FRAME_WIDTH))
+height5 = int(cap5.get(cv2.CAP_PROP_FRAME_HEIGHT))
+width6 = int(cap6.get(cv2.CAP_PROP_FRAME_WIDTH))
+height6 = int(cap6.get(cv2.CAP_PROP_FRAME_HEIGHT))
+fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+out2 = cv2.VideoWriter("FINAL_FIX_NO_SOUND.mp4", fourcc, 30, (width, height))
+
+while True:
+    ret, final_frame = cap5.read()
+    ret, frame2 = cap6.read()
+    if not ret:
+        break
+    px = coordinates_smooth_final_x[f]
+    py = coordinates_smooth_final_y[f]
+    eyes_hypot_smooth_width = eyes_hypot_smooth[f]
+    eyes_hypot_smooth_height = eyes_hypot_smooth_width
+    frame2_alpha = cv2.cvtColor(frame2, cv2.COLOR_BGR2BGRA)
+    # print(frame2.shape)
+    # frame2_resize = cv2.resize(frame2_alpha, (width4 // 3, height4 // 3))
+    frame2_cropped = frame2_alpha[300:440, 80:220]
+    frame2_resize_from_eyes = cv2.resize(frame2_cropped, (eyes_hypot_smooth_width, eyes_hypot_smooth_height))
+    # M = cv2.getRotationMatrix2D((px, py), angle_mouth_smooth_float[f], 1)
+    # frame2_rot = cv2.warpAffine(frame2_resize_from_eyes, M, (frame2_resize_from_eyes.shape[1], frame2_resize_from_eyes.shape[0]))
+    frame2_gray = cv2.cvtColor(frame2_resize_from_eyes, cv2.COLOR_BGRA2GRAY)
+    _, mouth_mask = cv2.threshold(frame2_gray, 2, 255, cv2.THRESH_BINARY_INV)
+    frame2_darker = cv2.addWeighted(frame2_resize_from_eyes, 1, np.zeros(frame2_resize_from_eyes.shape, frame2_resize_from_eyes.dtype), 0, -10)
+    img_result = final_frame.copy()
+    img_result = cv2.cvtColor(final_frame, cv2.COLOR_BGR2BGRA)
+
+    # to change the location of the mouth, change the (int(eyes_hypot_smooth_width // x - the higher x the lower the mouth
+    # top_left_mouth_area = (px-(eyes_hypot_smooth_width // 2), py-(int(eyes_hypot_smooth_width // 5)))
+    # bottom_right_mouth_area = (px+(eyes_hypot_smooth_width // 2), py+(eyes_hypot_smooth_width // 2))
+    top_left_mouth_area = (px-(eyes_hypot_smooth_width // 2)+x_offset_int, py+y_offset_int)
+    bottom_right_mouth_area = (px+(eyes_hypot_smooth_width // 2)+x_offset_int, py+eyes_hypot_smooth_width+y_offset_int)
+    mouth_area = img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height, top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width]
+    # cv2.circle(img_result, center=tuple([px, py]), radius=5, color=(0, 0, 255), thickness=-1)
+    # # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
+    dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
+    final_mouth = cv2.addWeighted(dog_face_no_mouth, 1, frame2_resize_from_eyes, 1, 1)
+    img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height, top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width] = final_mouth
+    cv2.imshow('result', img_result)
+    f += 1
+    # cv2.imshow('result2', dog_face_no_mouth)
+    if cv2.waitKey(fps) & 0xFF == ord('q'):
+        break
+    img_result = cv2.cvtColor(img_result, cv2.COLOR_BGRA2BGR)
+    out2.write(img_result)
+out2.release()
+cap5.release()
+cap6.release()
+cv2.destroyAllWindows()
+
+clip_fix = VideoFileClip("FINAL_FIX_NO_SOUND.mp4")
+clip2 = VideoFileClip("VID_FACE.mp4")
+clip3 = VideoFileClip("VID_PET.mp4")
+# clip2 = clip2.set_fps(30.0)
+aclip_fix = clip_fix.audio
+aclip2 = clip2.audio
+aclip3 = clip3.audio
+sound_both2 = CompositeAudioClip([aclip3, aclip2])
+clip_fix.audio = sound_both2
+clip_fix.write_videofile("FINAL_PETME_FIX.mp4")
+s4 = socket.socket()
+host = socket.gethostname()
+ip_address = "192.168.0.14"
+BUFFER_SIZE = 1024
+port = 8080
+s4.bind((host, port))
+
+while True:
+    s4.listen(1)
+    print("waiting for someone to connect...")
+    conn, addr = s3.accept()
+    print('Got connection from', addr)
+    # data = conn.recv(1024)
+    # print('Server received', repr(data))
+
+    # f = open(filename, 'rb')
+    with open('FINAL_PETME_FIX.mp4', 'rb') as f:
+        lll = f.read(1024)
+        while lll:
+            data = conn.send(lll)
+            print('Sent ', repr(lll))
+            print(len(lll))
+            lll = f.read(1024)
+            # if not data:
+            #     break
+    f.close()
+    print('Done sending')
+    conn.close()
+    # s4.close()
+    print('connection closed')
+    break
