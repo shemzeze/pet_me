@@ -9,6 +9,7 @@ from vidstab import VidStab
 from moviepy.editor import *
 from moviepy import video
 import threading
+import queue
 
 
 def angle_between(p1, p2):
@@ -17,13 +18,13 @@ def angle_between(p1, p2):
     return degrees(atan2(yDiff, xDiff))
 
 
-def find_dog_face(vid):
+def find_dog_face(queue):
     print("finding pet Landmarks")
     clip = VideoFileClip("VID_PET.mp4")
     clip = video.fx.all.resize(clip, (320, 640))
     clip.write_videofile("VID_PET_SMALL.mp4")
     SCALE_FACTOR = 0.2
-    vid = sys.argv[0]
+    # vid = sys.argv[0]
     cap = cv2.VideoCapture("VID_PET_SMALL.mp4")
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -34,7 +35,6 @@ def find_dog_face(vid):
     right_eye_coordinates = np.empty((0, 2), dtype=int)
     eyes_width_arr = np.empty(1, dtype="int32")
     angle_eyes = []
-
 
     # print(nose_coordinates)
 
@@ -69,7 +69,6 @@ def find_dog_face(vid):
             print(nose_coordinates[-1])
             continue
 
-
         for i, d in enumerate(roi):
             # x1, y1 = int(d.rect.left() / SCALE_FACTOR), int(d.rect.top() / SCALE_FACTOR)
             # x2, y2 = int(d.rect.right() / SCALE_FACTOR), int(d.rect.bottom() / SCALE_FACTOR)
@@ -96,13 +95,15 @@ def find_dog_face(vid):
             break
     eyes_width_arr = eyes_width_arr[1:]
     # print(angle_eyes)
+    nose_coo_final = nose_coordinates * 5
+    eyes_width_final = eyes_width_arr * 5
     # print(eyes_width_arr)
-    return nose_coordinates * 5, eyes_width_arr * 5, angle_eyes
+    queue.put((nose_coo_final, eyes_width_final))
 
 
 s = socket.socket()
 host = socket.gethostname()
-ip_address = "192.168.0.14"
+ip_address = "192.168.0.12"
 BUFFER_SIZE = 1024
 port = 8080
 s.bind((host, port))
@@ -125,52 +126,17 @@ while True:
             f.write(data)
     f.close()
     print('Successfully get the file')
-    # t1 = threading.Thread(target=find_dog_face, args="VID_PET.mp4")
-    # t1.start()
-    coordinates, eyes_hypot, angle_mouth = find_dog_face("VID_PET.mp4")
-    coordinates_x = coordinates[:, 0]
-    coordinates_y = coordinates[:, 1]
-    x_smooth_float = savgol_filter(coordinates_x, 31, 3, mode="nearest")
-    coordinates_smooth_x = np.empty(1, dtype="int32")
-    coordinates_smooth_y = np.empty(1, dtype="int32")
-    eyes_hypot_smooth = np.empty(1, dtype="int32")
-    for x in x_smooth_float:
-        x = int(x)
-        coordinates_smooth_x = np.append(coordinates_smooth_x, [x], axis=0)
-    y_smooth_float = savgol_filter(coordinates_y, 31, 3, mode="nearest")
-    for y in y_smooth_float:
-        y = int(y)
-        coordinates_smooth_y = np.append(coordinates_smooth_y, [y], axis=0)
-
-    eyes_hypot_smooth_float = savgol_filter(eyes_hypot, 31, 3, mode="nearest")
-    for w in eyes_hypot_smooth_float:
-        w = int(w)
-        eyes_hypot_smooth = np.append(eyes_hypot_smooth, [w], axis=0)
-    angle_mouth_smooth_float = savgol_filter(angle_mouth, 31, 3, mode="nearest")
-
-    # plt.plot(angle_mouth_smooth_float, color="red")
-    # # # plt.plot(coordinates_y, color="red")
-    # plt.plot(angle_mouth, color="green")
-    # # plt.plot(coordinates_smooth_y[1:], color="green")
-    # print(eyes_hypot_smooth[1:])
-    # # print(coordinates_smooth_y)
-    # plt.show()
-    coordinates_smooth_final_x = coordinates_smooth_x[1:]
-    coordinates_smooth_final_y = coordinates_smooth_y[1:]
-    eyes_hypot_smooth = eyes_hypot_smooth[1:]
     s.close()
-    print('connection closed')
     break
+print('connection closed')
 
 
-s2 = socket.socket()
-host = socket.gethostname()
-ip_address = "192.168.0.14"
-BUFFER_SIZE = 1024
-port = 8080
-s2.bind((host, port))
-
-while True:
+def waitForSecondVid():
+    s2 = socket.socket()
+    host2 = socket.gethostname()
+    BUFFER_SIZE = 1024
+    port = 8080
+    s2.bind((host2, port))
     s2.listen(1)
     print("waiting for someone to connect...")
     conn, addr = s2.accept()
@@ -188,64 +154,103 @@ while True:
             # write data to a file
             f.write(data)
     f.close()
-    print('Successfully get the file')
-    clip2 = VideoFileClip("VID_FACE.mp4")
-    clip2 = video.fx.all.resize(clip2, (320, 640))
-    clip2.write_videofile("VID_FACE_SMALL.mp4")
-    print("Stabilizing face vid")
-    stabilizer = VidStab()
-    stabilizer.stabilize(input_path="VID_FACE_SMALL.mp4", output_path="VID_FACE_STAB.mp4", output_fourcc="mp4v",
-                         smoothing_window=100)
-    print("Video is stabilized")
-    cap2 = cv2.VideoCapture("VID_FACE_STAB.mp4")
-    detector = dlib.get_frontal_face_detector()
-    predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-    width = int(cap2.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap2.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    sourcePath = "Stabilize head.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter("VID_MOUTH_CROP.mp4", fourcc, 30, (width, height))
-    while True:
-        ret, frame = cap2.read()
-        if not ret:
-            break
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        mask = np.zeros_like(gray)
-        faces = detector(gray)
-        for face in faces:
-            x1 = face.left()
-            y1 = face.top()
-            x2 = face.right()
-            y2 = face.bottom()
-            # cv2.rectangle(frame, (x1, y1), (x2, y2), (255,0,10), 5)
-            landmarks = predictor(gray, face)
-            landmark_points = []
-            for n in range(48, 68):
-                x = landmarks.part(n).x
-                y = landmarks.part(n).y
-                landmark_points.append((x, y))
-            # cv2.rectangle(frame_rot, (top_left_x, top_left_y), (bot_left_x, bot_left_y), (255,0,10), 5)
-            points = np.array(landmark_points, np.int32)
-            convexhull = cv2.convexHull(points)
-            # cv2.polylines(frame, [convexhull], True, (0, 255, 0), 3)
-            mouth_fill = cv2.fillConvexPoly(mask, convexhull, 255)
-            kernel = np.ones((10, 10), np.float32) / 100
-            dst = cv2.filter2D(mouth_fill, -1, kernel)
-            mask = cv2.dilate(mouth_fill, kernel, dst)
-            mask = cv2.blur(mouth_fill, (10, 10))
-
-        mouth_mask = cv2.bitwise_and(frame, frame, mask=mask)
-        cv2.imshow("mouth mask", mouth_mask)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-        out.write(mouth_mask)
-    cap2.release()
-    out.release()
-    cv2.destroyAllWindows()
     s2.close()
-    print('connection closed')
-    break
+    print('Successfully get the file')
 
+
+queue = queue.Queue()
+t1 = threading.Thread(target=find_dog_face, args=(queue, ))
+t1.start()
+t2 = threading.Thread(target=waitForSecondVid)
+t2.start()
+t1.join()
+t2.join()
+nose_coo_final, eyes_width_final = queue.get()
+# coordinates, eyes_hypot, angle_mouth = find_dog_face("VID_PET.mp4")
+coordinates_x = nose_coo_final[:, 0]
+coordinates_y = nose_coo_final[:, 1]
+x_smooth_float = savgol_filter(coordinates_x, 31, 3, mode="nearest")
+coordinates_smooth_x = np.empty(1, dtype="int32")
+coordinates_smooth_y = np.empty(1, dtype="int32")
+eyes_hypot_smooth = np.empty(1, dtype="int32")
+for x in x_smooth_float:
+    x = int(x)
+    coordinates_smooth_x = np.append(coordinates_smooth_x, [x], axis=0)
+y_smooth_float = savgol_filter(coordinates_y, 31, 3, mode="nearest")
+for y in y_smooth_float:
+    y = int(y)
+    coordinates_smooth_y = np.append(coordinates_smooth_y, [y], axis=0)
+
+eyes_hypot_smooth_float = savgol_filter(eyes_width_final, 31, 3, mode="nearest")
+for w in eyes_hypot_smooth_float:
+    w = int(w)
+    eyes_hypot_smooth = np.append(eyes_hypot_smooth, [w], axis=0)
+# angle_mouth_smooth_float = savgol_filter(angle_mouth, 31, 3, mode="nearest")
+
+# plt.plot(angle_mouth_smooth_float, color="red")
+# # # plt.plot(coordinates_y, color="red")
+# plt.plot(angle_mouth, color="green")
+# # plt.plot(coordinates_smooth_y[1:], color="green")
+# print(eyes_hypot_smooth[1:])
+# # print(coordinates_smooth_y)
+# plt.show()
+coordinates_smooth_final_x = coordinates_smooth_x[1:]
+coordinates_smooth_final_y = coordinates_smooth_y[1:]
+eyes_hypot_smooth = eyes_hypot_smooth[1:]
+clip2 = VideoFileClip("VID_FACE.mp4")
+clip2 = video.fx.all.resize(clip2, (320, 640))
+clip2.write_videofile("VID_FACE_SMALL.mp4")
+print("Stabilizing face vid")
+stabilizer = VidStab()
+stabilizer.stabilize(input_path="VID_FACE_SMALL.mp4", output_path="VID_FACE_STAB.mp4", output_fourcc="mp4v",
+                     smoothing_window=100)
+print("Video is stabilized")
+cap2 = cv2.VideoCapture("VID_FACE_STAB.mp4")
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+width = int(cap2.get(cv2.CAP_PROP_FRAME_WIDTH))
+height = int(cap2.get(cv2.CAP_PROP_FRAME_HEIGHT))
+sourcePath = "Stabilize head.mp4"
+fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+out = cv2.VideoWriter("VID_MOUTH_CROP.mp4", fourcc, 30, (width, height))
+while True:
+    ret, frame = cap2.read()
+    if not ret:
+        break
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    mask = np.zeros_like(gray)
+    faces = detector(gray)
+    for face in faces:
+        x1 = face.left()
+        y1 = face.top()
+        x2 = face.right()
+        y2 = face.bottom()
+        # cv2.rectangle(frame, (x1, y1), (x2, y2), (255,0,10), 5)
+        landmarks = predictor(gray, face)
+        landmark_points = []
+        for n in range(48, 68):
+            x = landmarks.part(n).x
+            y = landmarks.part(n).y
+            landmark_points.append((x, y))
+        # cv2.rectangle(frame_rot, (top_left_x, top_left_y), (bot_left_x, bot_left_y), (255,0,10), 5)
+        points = np.array(landmark_points, np.int32)
+        convexhull = cv2.convexHull(points)
+        # cv2.polylines(frame, [convexhull], True, (0, 255, 0), 3)
+        mouth_fill = cv2.fillConvexPoly(mask, convexhull, 255)
+        kernel = np.ones((10, 10), np.float32) / 100
+        dst = cv2.filter2D(mouth_fill, -1, kernel)
+        mask = cv2.dilate(mouth_fill, kernel, dst)
+        mask = cv2.blur(mouth_fill, (10, 10))
+
+    mouth_mask = cv2.bitwise_and(frame, frame, mask=mask)
+    cv2.imshow("mouth mask", mouth_mask)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+    out.write(mouth_mask)
+cap2.release()
+out.release()
+cv2.destroyAllWindows()
+print('connection closed')
 # t1.join()
 cap3 = cv2.VideoCapture("VID_PET_SMALL.mp4")
 cap4 = cv2.VideoCapture("VID_MOUTH_CROP.mp4")
@@ -256,7 +261,7 @@ height3 = int(cap3.get(cv2.CAP_PROP_FRAME_HEIGHT))
 width4 = int(cap4.get(cv2.CAP_PROP_FRAME_WIDTH))
 height4 = int(cap4.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-out = cv2.VideoWriter("FINAL_NO_SOUND.mp4", fourcc, 30, (width, height))
+out = cv2.VideoWriter("FINAL_NO_SOUND.mp4", fourcc, 30, (width3, height3))
 
 while True:
     ret, final_frame = cap3.read()
@@ -270,30 +275,57 @@ while True:
     frame2_alpha = cv2.cvtColor(frame2, cv2.COLOR_BGR2BGRA)
     # print(frame2.shape)
     # frame2_resize = cv2.resize(frame2_alpha, (width4 // 3, height4 // 3))
+    # if px < 70:
+    #     frame2_cropped = frame2_alpha[300:440, 80 + (70 - px):220]
+    # elif px > 250:
+    #     frame2_cropped = frame2_alpha[300:440, 80:220 - (px - 250)]
+    # elif py < 70:
+    #     frame2_cropped = frame2_alpha[300 + (70 - px):440, 80:220]
+    # elif py > 570:
+    #     frame2_cropped = frame2_alpha[300:440 - (py - 570), 80:220]
+    # else:
     frame2_cropped = frame2_alpha[300:440, 80:220]
     frame2_resize_from_eyes = cv2.resize(frame2_cropped, (eyes_hypot_smooth_width, eyes_hypot_smooth_height))
     # M = cv2.getRotationMatrix2D((px, py), angle_mouth_smooth_float[f], 1)
     # frame2_rot = cv2.warpAffine(frame2_resize_from_eyes, M, (frame2_resize_from_eyes.shape[1], frame2_resize_from_eyes.shape[0]))
     frame2_gray = cv2.cvtColor(frame2_resize_from_eyes, cv2.COLOR_BGRA2GRAY)
     _, mouth_mask = cv2.threshold(frame2_gray, 2, 255, cv2.THRESH_BINARY_INV)
-    frame2_darker = cv2.addWeighted(frame2_resize_from_eyes, 1, np.zeros(frame2_resize_from_eyes.shape, frame2_resize_from_eyes.dtype), 0, -10)
+    frame2_darker = cv2.addWeighted(frame2_resize_from_eyes, 1,
+                                    np.zeros(frame2_resize_from_eyes.shape, frame2_resize_from_eyes.dtype), 0, -10)
     img_result = final_frame.copy()
     img_result = cv2.cvtColor(final_frame, cv2.COLOR_BGR2BGRA)
 
     # to change the location of the mouth, change the (int(eyes_hypot_smooth_width // x - the higher x the lower the mouth
     # top_left_mouth_area = (px-(eyes_hypot_smooth_width // 2), py-(int(eyes_hypot_smooth_width // 5)))
     # bottom_right_mouth_area = (px+(eyes_hypot_smooth_width // 2), py+(eyes_hypot_smooth_width // 2))
-    top_left_mouth_area = (px-(eyes_hypot_smooth_width // 2), py)
-    bottom_right_mouth_area = (px+(eyes_hypot_smooth_width // 2), py+eyes_hypot_smooth_width)
-    mouth_area = img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height, top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width]
-    # cv2.circle(img_result, center=tuple([px, py]), radius=5, color=(0, 0, 255), thickness=-1)
-    # # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
-    dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
-    final_mouth = cv2.addWeighted(dog_face_no_mouth, 1, frame2_resize_from_eyes, 1, 1)
-    img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height, top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width] = final_mouth
+    # if px < 70:
+    #     top_left_mouth_area = (0, py)
+    #     bottom_right_mouth_area = (px + (eyes_hypot_smooth_width // 2), py + eyes_hypot_smooth_width)
+    # elif px > 250:
+    #     top_left_mouth_area = (px - (eyes_hypot_smooth_width // 2), py)
+    #     bottom_right_mouth_area = (320, py + eyes_hypot_smooth_width)
+    # elif py < 70:
+    #     top_left_mouth_area = (px - (eyes_hypot_smooth_width // 2), 0)
+    #     bottom_right_mouth_area = (px + (eyes_hypot_smooth_width // 2), py + eyes_hypot_smooth_width)
+    # elif py > 570:
+    #     top_left_mouth_area = (px - (eyes_hypot_smooth_width // 2), py)
+    #     bottom_right_mouth_area = (px + (eyes_hypot_smooth_width // 2), 640)
+    # else:
+    top_left_mouth_area = (px - (eyes_hypot_smooth_width // 2), py)
+    bottom_right_mouth_area = (px + (eyes_hypot_smooth_width // 2), py + eyes_hypot_smooth_width)
+    mouth_area = img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height,
+                 top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width]
+    if mouth_area.shape == frame2_resize_from_eyes.shape:
+        # cv2.circle(img_result, center=tuple([px, py]), radius=5, color=(0, 0, 255), thickness=-1)
+        # # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
+        dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
+        final_mouth = cv2.addWeighted(dog_face_no_mouth, 1, frame2_resize_from_eyes, 1, 1)
+        img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height,
+        top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width] = final_mouth
+    else:
+        img_result = final_frame.copy()
     cv2.imshow('result', img_result)
     f += 1
-    # cv2.imshow('result2', dog_face_no_mouth)
     if cv2.waitKey(fps) & 0xFF == ord('q'):
         break
     img_result = cv2.cvtColor(img_result, cv2.COLOR_BGRA2BGR)
@@ -302,7 +334,6 @@ out.release()
 cap3.release()
 cap4.release()
 cv2.destroyAllWindows()
-
 
 clip = VideoFileClip("FINAL_NO_SOUND.mp4")
 clip2 = VideoFileClip("VID_FACE.mp4")
@@ -317,7 +348,7 @@ clip.write_videofile("FINAL_PETME.mp4")
 
 s3 = socket.socket()
 host = socket.gethostname()
-ip_address = "192.168.0.14"
+ip_address = "192.168.0.12"
 BUFFER_SIZE = 1024
 port = 8080
 s3.bind((host, port))
@@ -347,7 +378,6 @@ while True:
     print('connection closed')
     break
 
-
 s3.listen(1)
 print("waiting for someone to connect...")
 conn, addr = s3.accept()
@@ -367,7 +397,7 @@ height5 = int(cap5.get(cv2.CAP_PROP_FRAME_HEIGHT))
 width6 = int(cap6.get(cv2.CAP_PROP_FRAME_WIDTH))
 height6 = int(cap6.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-out2 = cv2.VideoWriter("FINAL_FIX_NO_SOUND.mp4", fourcc, 30, (width, height))
+out2 = cv2.VideoWriter("FINAL_FIX_NO_SOUND.mp4", fourcc, 30, (width5, height5))
 
 while True:
     ret, final_frame = cap5.read()
@@ -381,27 +411,35 @@ while True:
     frame2_alpha = cv2.cvtColor(frame2, cv2.COLOR_BGR2BGRA)
     # print(frame2.shape)
     # frame2_resize = cv2.resize(frame2_alpha, (width4 // 3, height4 // 3))
-    frame2_cropped = frame2_alpha[300:440, 80:220]
+    frame2_cropped = frame2_alpha[300:440, 100:240]
+    # frame2_cropped = frame2_alpha[px-70:px+70, py-70:py+70]
     frame2_resize_from_eyes = cv2.resize(frame2_cropped, (eyes_hypot_smooth_width, eyes_hypot_smooth_height))
     # M = cv2.getRotationMatrix2D((px, py), angle_mouth_smooth_float[f], 1)
     # frame2_rot = cv2.warpAffine(frame2_resize_from_eyes, M, (frame2_resize_from_eyes.shape[1], frame2_resize_from_eyes.shape[0]))
     frame2_gray = cv2.cvtColor(frame2_resize_from_eyes, cv2.COLOR_BGRA2GRAY)
     _, mouth_mask = cv2.threshold(frame2_gray, 2, 255, cv2.THRESH_BINARY_INV)
-    frame2_darker = cv2.addWeighted(frame2_resize_from_eyes, 1, np.zeros(frame2_resize_from_eyes.shape, frame2_resize_from_eyes.dtype), 0, -10)
+    frame2_darker = cv2.addWeighted(frame2_resize_from_eyes, 1,
+                                    np.zeros(frame2_resize_from_eyes.shape, frame2_resize_from_eyes.dtype), 0, -10)
     img_result = final_frame.copy()
     img_result = cv2.cvtColor(final_frame, cv2.COLOR_BGR2BGRA)
 
     # to change the location of the mouth, change the (int(eyes_hypot_smooth_width // x - the higher x the lower the mouth
     # top_left_mouth_area = (px-(eyes_hypot_smooth_width // 2), py-(int(eyes_hypot_smooth_width // 5)))
     # bottom_right_mouth_area = (px+(eyes_hypot_smooth_width // 2), py+(eyes_hypot_smooth_width // 2))
-    top_left_mouth_area = (px-(eyes_hypot_smooth_width // 2)+x_offset_int, py+y_offset_int)
-    bottom_right_mouth_area = (px+(eyes_hypot_smooth_width // 2)+x_offset_int, py+eyes_hypot_smooth_width+y_offset_int)
-    mouth_area = img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height, top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width]
-    # cv2.circle(img_result, center=tuple([px, py]), radius=5, color=(0, 0, 255), thickness=-1)
-    # # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
-    dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
-    final_mouth = cv2.addWeighted(dog_face_no_mouth, 1, frame2_resize_from_eyes, 1, 1)
-    img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height, top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width] = final_mouth
+    top_left_mouth_area = (px - (eyes_hypot_smooth_width // 2) + x_offset_int, py + y_offset_int)
+    bottom_right_mouth_area = (
+        px + (eyes_hypot_smooth_width // 2) + x_offset_int, py + eyes_hypot_smooth_width + y_offset_int)
+    mouth_area = img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height,
+                 top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width]
+    if mouth_area.shape == frame2_resize_from_eyes.shape:
+        # cv2.circle(img_result, center=tuple([px, py]), radius=5, color=(0, 0, 255), thickness=-1)
+        # # cv2.rectangle(img_result, (px-100, py+100), (px+100, py-100), (255, 0, 0), 2)
+        dog_face_no_mouth = cv2.bitwise_and(mouth_area, mouth_area, mask=mouth_mask)
+        final_mouth = cv2.addWeighted(dog_face_no_mouth, 1, frame2_resize_from_eyes, 1, 1)
+        img_result[top_left_mouth_area[1]:top_left_mouth_area[1] + eyes_hypot_smooth_height,
+        top_left_mouth_area[0]:top_left_mouth_area[0] + eyes_hypot_smooth_width] = final_mouth
+    else:
+        img_result = final_frame.copy()
     cv2.imshow('result', img_result)
     f += 1
     # cv2.imshow('result2', dog_face_no_mouth)
@@ -426,7 +464,7 @@ clip_fix.audio = sound_both2
 clip_fix.write_videofile("FINAL_PETME_FIX.mp4")
 s4 = socket.socket()
 host = socket.gethostname()
-ip_address = "192.168.0.14"
+ip_address = "192.168.0.12"
 BUFFER_SIZE = 1024
 port = 8080
 s4.bind((host, port))
